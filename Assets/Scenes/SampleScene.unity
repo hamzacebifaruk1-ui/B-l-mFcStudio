@@ -527,11 +527,10 @@ MonoBehaviour:
   minDistance: 3
   maxDistance: 12
   heightOffset: 1.5
-  xSensitivity: 0.2
-  ySensitivity: 0.2
+  xSensitivity: 15
+  ySensitivity: 15
   zoomSensitivity: 0.5
-  rotationSmoothTime: 0.05
-  followSmoothTime: 0.1
+  followSpeed: 20
   yMinLimit: -10
   yMaxLimit: 70
 --- !u!1 &646192583

@@ -4,41 +4,32 @@ using UnityEngine.InputSystem;
 public class CameraFollow : MonoBehaviour
 {
     [Header("Target")]
-    public Transform target; // Takip edilecek araç objesi
+    public Transform target;            // Takip edilecek araç objesi
 
     [Header("Distance & Offset")]
     public float distance = 7.0f;       // Kameranın araca uzaklığı
-    public float minDistance = 3.0f;    // En yakın mesafe
-    public float maxDistance = 15.0f;   // En uzak mesafe
-    public float heightOffset = 2.0f;   // Aracın merkezinden yükseklik payı
+    public float minDistance = 3.0f;    // Yakınlaşma sınırı
+    public float maxDistance = 15.0f;   // Uzaklaşma sınırı
+    public float heightOffset = 1.8f;   // Odak yüksekliği
 
-    [Header("Sensitivity & Smoothing")]
-    public float xSensitivity = 15.0f;  // X Eksen Hassasiyeti (Yeni ölçek)
-    public float ySensitivity = 15.0f;  // Y Eksen Hassasiyeti (Yeni ölçek)
-    public float zoomSensitivity = 2.0f;
-    public float rotationSmoothTime = 0.05f; // Açı yumuşatma süresi
-    public float followSmoothTime = 0.1f;   // Pozisyon yumuşatma süresi
+    [Header("Sensitivity & Speed")]
+    public float xSensitivity = 350.0f; // Fare X hassasiyeti (Yükseltildi)
+    public float ySensitivity = 250.0f; // Fare Y hassasiyeti (Yükseltildi)
+    public float zoomSensitivity = 3.0f;
+    public float followSpeed = 20.0f;   // Kamera takip hızı
 
     [Header("Limits")]
-    public float yMinLimit = -5f;       // Kameranın aşağı inme sınırı
-    public float yMaxLimit = 60f;       // Kameranın yukarı çıkma sınırı
+    public float yMinLimit = -5f;       // Aşağı bakış sınırı
+    public float yMaxLimit = 60f;       // Yukarı bakış sınırı
 
-    private float x = 0.0f;
-    private float y = 20.0f;
-
-    private float currentX;
-    private float currentY;
-    private float xVelocity;
-    private float yVelocity;
-    private Vector3 currentVelocity;
+    private float rotX = 0.0f;
+    private float rotY = 20.0f;
 
     private void Start()
     {
         Vector3 angles = transform.eulerAngles;
-        x = angles.y;
-        y = angles.x;
-        currentX = x;
-        currentY = y;
+        rotX = angles.y;
+        rotY = angles.x;
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -46,16 +37,18 @@ public class CameraFollow : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (!target) return;
+        if (target == null) return;
 
-        // Fare Girdilerini Alma ve Time.deltaTime ile Çarpma (Dengeli Hassasiyet)
+        // Fare Girdilerini Alma
         if (Mouse.current != null)
         {
             Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-            x += mouseDelta.x * xSensitivity * Time.deltaTime;
-            y -= mouseDelta.y * ySensitivity * Time.deltaTime;
+            
+            // Hassasiyet çarpanı artırıldı
+            rotX += mouseDelta.x * xSensitivity * Time.deltaTime;
+            rotY -= mouseDelta.y * ySensitivity * Time.deltaTime;
 
-            y = ClampAngle(y, yMinLimit, yMaxLimit);
+            rotY = Mathf.Clamp(rotY, yMinLimit, yMaxLimit);
 
             float scroll = Mouse.current.scroll.ReadValue().y;
             if (Mathf.Abs(scroll) > 0.01f)
@@ -65,24 +58,13 @@ public class CameraFollow : MonoBehaviour
             }
         }
 
-        // Açıyı Yumuşatma (SmoothDamp Angle)
-        currentX = Mathf.SmoothDampAngle(currentX, x, ref xVelocity, rotationSmoothTime);
-        currentY = Mathf.SmoothDampAngle(currentY, y, ref yVelocity, rotationSmoothTime);
+        // Pozisyon ve Rotasyon Hesaplama
+        Quaternion targetRotation = Quaternion.Euler(rotY, rotX, 0);
+        Vector3 targetCenter = target.position + (Vector3.up * heightOffset);
+        Vector3 desiredPosition = targetCenter - (targetRotation * Vector3.forward * distance);
 
-        // Hedef Pozisyonu Hesaplama
-        Quaternion rotation = Quaternion.Euler(currentY, currentX, 0);
-        Vector3 targetPosition = target.position + Vector3.up * heightOffset;
-        Vector3 desiredPosition = targetPosition - (rotation * Vector3.forward * distance);
-
-        // Pozisyonu Yumuşatarak Takip Etme (SmoothDamp Vector3)
-        transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref currentVelocity, followSmoothTime);
-        transform.rotation = rotation;
-    }
-
-    private static float ClampAngle(float angle, float min, float max)
-    {
-        if (angle < -360F) angle += 360F;
-        if (angle > 360F) angle -= 360F;
-        return Mathf.Clamp(angle, min, max);
+        // Hızlı ve Akıcı Takip
+        transform.position = Vector3.Lerp(transform.position, desiredPosition, Time.deltaTime * followSpeed);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * followSpeed);
     }
 }
